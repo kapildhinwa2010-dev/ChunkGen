@@ -1,7 +1,8 @@
 # ChunkGen
 
 [![CI](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/ci.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/ci.yml)
-[![CI](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml)
+[![CodeQL](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml)
+
 
 Chunked matrix generation: row-chunk iteration with constant per-chunk consumer memory.
 
