@@ -1,40 +1,25 @@
 # ChunkGen - Chunked matrix generation with constant per-chunk memory
 # Part of the Kapildhinwa2010-dev Toolkit.
 
-"""GenSuite - matrix generation engines: infinite, chunked, safe, parallel, stream.
+"""Row-chunked views of a seeded recipe matrix.
 
-Lineage: DNA_DYNIMO's production generators. One seeded recipe, five
-execution modes for producing large weight matrices without ever holding
-more than one chunk in memory (unless you ask for it).
+Lineage: DNA_DYNIMO generators. This repo owns the CHUNKED mode: iterate
+the canonical matrix in row chunks without materializing the whole array
+up-front in the consumer, plus chunk_boundaries() for planning.
+
+HONEST LIMITATION: generate_chunked slices a fully materialized matrix,
+so peak memory inside this function is still the full array; the
+constant-memory benefit applies to the CONSUMER processing chunk by
+chunk. For true never-materialized streaming see StreamGen.
 """
 
 from __future__ import annotations
 
 import math
-from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
-__all__ = [
-    "GenRecipe",
-    "MemoryBudget",
-    "generate",
-    "generate_infinite",
-    "generate_chunked",
-    "generate_safe",
-    "generate_parallel",
-    "generate_stream",
-    "load_stream",
-]
-
-
-class MemoryBudget(Exception):
-    """A generation request exceeded the allowed byte budget."""
-
-    def __init__(self, needed: int, allowed: int) -> None:
-        super().__init__("need {} bytes, budget allows {}".format(needed, allowed))
-        self.needed = needed
-        self.allowed = allowed
+__all__ = ["GenRecipe", "generate", "generate_chunked", "chunk_boundaries"]
 
 
 class GenRecipe:
@@ -61,15 +46,6 @@ def generate(recipe: GenRecipe) -> np.ndarray:
     """The canonical matrix of the recipe (seed + 0)."""
     return recipe._latent(0)
 
-
-def generate_infinite(recipe: GenRecipe):
-    """Yield an endless stream of independent matrices from the recipe."""
-    counter = 0
-    while True:
-        yield recipe._latent(counter)
-        counter += 1
-
-
 def generate_chunked(recipe: GenRecipe, chunk_rows: int):
     """Yield ``generate(recipe)`` in row-chunks; vstack of chunks == full."""
     if chunk_rows < 1:
@@ -79,41 +55,11 @@ def generate_chunked(recipe: GenRecipe, chunk_rows: int):
         yield full[start:start + chunk_rows]
 
 
-def generate_safe(recipe: GenRecipe, max_bytes: int = 8 * 1024 * 1024) -> np.ndarray:
-    """Generate only if the float64 result fits in ``max_bytes``."""
-    if max_bytes < 1:
-        raise ValueError("max_bytes must be >= 1")
-    needed = recipe.rows * recipe.cols * 8
-    if needed > max_bytes:
-        raise MemoryBudget(needed, max_bytes)
-    return generate(recipe)
+def chunk_boundaries(rows: int, chunk_rows: int) -> list:
+    """(start, end) row ranges produced by chunking ``rows`` rows.
 
-
-def generate_parallel(recipe: GenRecipe, blocks: int = 4, workers: int = 2) -> list:
-    """Generate ``blocks`` independent matrices across worker threads."""
-    if blocks < 1:
-        raise ValueError("blocks must be >= 1")
-    if workers < 1:
-        raise ValueError("workers must be >= 1")
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(recipe._latent, range(blocks)))
-
-
-def generate_stream(recipe: GenRecipe, path: str, chunk_rows: int = 8) -> int:
-    """Stream row-chunks of the matrix into a raw binary file; return rows."""
-    if chunk_rows < 1:
-        raise ValueError("chunk_rows must be >= 1")
-    written = 0
-    with open(path, "wb") as fh:
-        for chunk in generate_chunked(recipe, chunk_rows):
-            fh.write(np.ascontiguousarray(chunk, dtype=np.float64).tobytes())
-            written += int(chunk.shape[0])
-    return written
-
-
-def load_stream(path: str, rows: int, cols: int) -> np.ndarray:
-    """Load a raw stream written by :func:`generate_stream`."""
-    data = np.fromfile(path, dtype=np.float64)
-    if data.size != rows * cols:
-        raise ValueError("file size mismatch: expected {} values, got {}".format(rows * cols, data.size))
-    return data.reshape(rows, cols)
+    Useful for planning: the last chunk may be shorter than chunk_rows.
+    """
+    if rows < 1 or chunk_rows < 1:
+        raise ValueError("rows and chunk_rows must be >= 1")
+    return [(start, min(start + chunk_rows, rows)) for start in range(0, rows, chunk_rows)]
