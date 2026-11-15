@@ -1,22 +1,20 @@
 # ChunkGen
 
 [![CI](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/ci.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml)
-![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml)
 
-Matrix generation engines: infinite, chunked, memory-safe, parallel and
-streamed generation from one seeded recipe. DNA_DYNIMO lineage of the
-[Kapildhinwa2010-dev Toolkit](https://github.com/kapildhinwa2010-dev/Kapildhinwa2010-dev).
+Chunked matrix generation: row-chunk iteration with constant per-chunk consumer memory.
 
-## Features
+**Part of the [Kapildhinwa2010-dev Toolkit](https://github.com/kapildhinwa2010-dev/Kapildhinwa2010-dev).**
 
-- Seeded low-rank `GenRecipe` - deterministic matrices
-- `generate_infinite` - endless independent matrices
-- `generate_chunked` - constant per-chunk memory
-- `generate_safe` - byte-budget guard with `MemoryBudget`
-- `generate_parallel` - thread-pool block generation
-- `generate_stream` / `load_stream` - raw disk streaming round-trip
+## What it does
+
+ChunkGen owns the CHUNKED mode of the DNA_DYNIMO generator family:
+generate_chunked() iterates the canonical recipe matrix in row
+chunks, and chunk_boundaries() plans the (start, end) ranges. The
+HONEST LIMITATION (also in the docstring): the function itself still
+materializes the full matrix; the constant-memory benefit applies to
+the CONSUMER. For true never-materialized streaming see StreamGen.
 
 ## Install
 
@@ -24,23 +22,30 @@ streamed generation from one seeded recipe. DNA_DYNIMO lineage of the
 pip install -r requirements.txt
 ```
 
-## Quickstart
+## Quick start
 
 ```python
-from chunkgen import GenRecipe, generate, generate_chunked
+from chunkgen import GenRecipe, generate_chunked, chunk_boundaries
 
 recipe = GenRecipe(rows=64, cols=128, rank=8, seed=0)
-W = generate(recipe)
 for chunk in generate_chunked(recipe, chunk_rows=16):
-    print(chunk.shape)
+    process(chunk)  # your chunk-wise work
+print(chunk_boundaries(64, 16))
 ```
 
-## Tests
+## API
 
-```bash
-pytest tests/ -v
-```
+- GenRecipe(rows, cols, rank, seed)
+- generate(recipe) - the canonical matrix
+- generate_chunked(recipe, chunk_rows) - row-chunk iterator
+- chunk_boundaries(rows, chunk_rows) - (start, end) planning ranges
+
+## Honest results and limitations
+
+- Peak memory inside generate_chunked is still the FULL array; only
+  the consumer side is constant-memory.
+- vstack of chunks equals the full matrix - no per-chunk randomness.
 
 ## License
 
-MIT
+MIT - see [LICENSE](LICENSE).
