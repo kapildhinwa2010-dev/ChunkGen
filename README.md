@@ -1,52 +1,54 @@
 # ChunkGen
 
-[![CI](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/ci.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml/badge.svg)](https://github.com/kapildhinwa2010-dev/ChunkGen/actions/workflows/codeql.yml)
+ChunkGen is a small Python library for generating a seeded, low-rank NumPy matrix and iterating over its rows in chunks. The project metadata declares version 0.1.0. Its chunked API divides an already-generated matrix; it does not generate the matrix as a memory-bounded stream.
 
+## Requirements and installation
 
-Chunked matrix generation: row-chunk iteration with constant per-chunk consumer memory.
+- Python 3.9 or newer
+- NumPy 1.24 or newer
 
-**Part of the [Kapildhinwa2010-dev Toolkit](https://github.com/kapildhinwa2010-dev/Kapildhinwa2010-dev).**
-
-## What it does
-
-ChunkGen owns the CHUNKED mode of the DNA_DYNIMO generator family:
-generate_chunked() iterates the canonical recipe matrix in row
-chunks, and chunk_boundaries() plans the (start, end) ranges. The
-HONEST LIMITATION (also in the docstring): the function itself still
-materializes the full matrix; the constant-memory benefit applies to
-the CONSUMER. For true never-materialized streaming see StreamGen.
-
-## Install
+Install the project from a checkout:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install .
 ```
 
-## Quick start
+For local development, install it in editable mode and install the test dependencies:
+
+```bash
+python -m pip install -e .
+python -m pip install -r requirements.txt
+```
+
+## Usage
 
 ```python
-from chunkgen import GenRecipe, generate_chunked, chunk_boundaries
+from chunkgen import GenRecipe, chunk_boundaries, generate, generate_chunked
 
 recipe = GenRecipe(rows=64, cols=128, rank=8, seed=0)
+matrix = generate(recipe)  # shape: (64, 128)
+
+# Each yielded array contains at most 16 rows.
 for chunk in generate_chunked(recipe, chunk_rows=16):
-    process(chunk)  # your chunk-wise work
-print(chunk_boundaries(64, 16))
+    row_means = chunk.mean(axis=1)
+    # Process row_means here rather than retaining all chunks.
+
+print(chunk_boundaries(rows=64, chunk_rows=16))
+# [(0, 16), (16, 32), (32, 48), (48, 64)]
 ```
 
-## API
+`GenRecipe(rows, cols, rank=8, seed=0)` validates positive dimensions and rank, and caps the effective rank at the smaller matrix dimension. `generate(recipe)` builds the matrix from seeded random factors. `generate_chunked(recipe, chunk_rows)` yields row slices, with a possibly shorter final chunk. `chunk_boundaries(rows, chunk_rows)` returns the corresponding `(start, end)` row ranges. Invalid dimensions, ranks, or chunk sizes raise `ValueError`.
 
-- GenRecipe(rows, cols, rank, seed)
-- generate(recipe) - the canonical matrix
-- generate_chunked(recipe, chunk_rows) - row-chunk iterator
-- chunk_boundaries(rows, chunk_rows) - (start, end) planning ranges
+## Memory and scope
 
-## Honest results and limitations
+`generate_chunked` calls `generate` first and materializes the complete matrix before yielding its first chunk. Its chunks are slices of that matrix. Chunk-wise consumer code can avoid building a second full-size result or retaining every chunk, but this API does **not** provide constant-memory matrix generation or eliminate the full matrix's memory cost.
 
-- Peak memory inside generate_chunked is still the FULL array; only
-  the consumer side is constant-memory.
-- vstack of chunks equals the full matrix - no per-chunk randomness.
+The repository contains a Python module and tests, but no command-line interface, persistent streaming generator, benchmark suite, or performance measurements. No claims about production readiness or performance are made here.
+
+## Tests and CI
+
+On the checked-out repository revision, `python -m pytest -q` completed with **9 passed**. The tests cover output shape and determinism, invalid arguments, chunk reconstruction, and chunk-boundary behavior. The CI workflow is configured to run tests and smoke checks on Python 3.10, 3.11, and 3.12; no result from a remote CI run is reported here.
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+The repository's `LICENSE` file contains the MIT License, with copyright notice `Copyright (c) 2026 Kapildhinwa2010-dev`. See [LICENSE](LICENSE) for the full terms.
